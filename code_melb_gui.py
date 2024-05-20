@@ -1,146 +1,140 @@
 import tkinter as tk
-from tkinter import messagebox
 from tkinter import ttk
-from tkinter import Scale
 import pandas as pd # type: ignore
 from sklearn.model_selection import train_test_split # type: ignore
 from sklearn.linear_model import LinearRegression, Ridge # type: ignore
-from sklearn.svm import SVR # type: ignore
-from sklearn.metrics import mean_absolute_error # type: ignore
-from sklearn.preprocessing import StandardScaler # type: ignore
+from sklearn.svm import SVR# type: ignore
+from sklearn.metrics import mean_absolute_error# type: ignore
+from sklearn.preprocessing import StandardScaler# type: ignore
 
-def load_data(file_path):
-    """Load data from CSV file."""
-    try:
-        data = pd.read_csv(file_path)
-        return data
-    except Exception as e:
-        messagebox.showerror("Error", f"Failed to load data: {e}")
+class HousePricePredictorGUI:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("House Price Predictor")
 
-def select_features(data, numeric_only=True):
-    """Select features from the dataset."""
-    if numeric_only:
-        numeric_columns = data.select_dtypes(include=['number']).columns.tolist()
-        return numeric_columns
-    else:
-        return data.columns.tolist()
+        self.model_options = ['Linear Regression', 'Ridge Regression', 'SVR']
+        self.selected_model = tk.StringVar(value=self.model_options[0])
 
-def split_data(X, y, test_size=0.2):
-    """Split data into training and testing sets."""
-    return train_test_split(X, y, test_size=test_size, random_state=1)
+        self.load_data()
+        self.create_widgets()
 
-def standardize_data(train_X, val_X, test_X):
-    """Standardize the data for models that require it."""
-    scaler = StandardScaler()
-    train_X_scaled = scaler.fit_transform(train_X)
-    val_X_scaled = scaler.transform(val_X)
-    test_X_scaled = scaler.transform(test_X)
-    return train_X_scaled, val_X_scaled, test_X_scaled
+    def load_data(self):
+        # Load dataset
+        self.melbourne_data = pd.read_csv('melb_data.csv')
+        # Drop rows with missing values
+        self.melbourne_data = self.melbourne_data.dropna(axis=0)
 
-def train_model(model_type, train_X, val_X, train_y, val_y, model_params=None):
-    """Train the selected model."""
-    if model_type == 'Linear Regression':
-        model = LinearRegression()
-    elif model_type == 'Ridge Regression':
-        model = Ridge(alpha=model_params.get('alpha', 1.0))
-    elif model_type == 'SVR':
-        model = SVR(kernel=model_params.get('kernel', 'rbf'),
-                    C=model_params.get('C', 100),
-                    gamma=model_params.get('gamma', 'scale'),
-                    epsilon=model_params.get('epsilon', 0.1))
-    else:
-        messagebox.showerror("Error", "Invalid model type")
-        return None
+    def create_widgets(self):
+        # Model Selection
+        model_label = ttk.Label(self.root, text="Select Model:")
+        model_label.grid(row=0, column=0, sticky=tk.W)
 
-    model.fit(train_X, train_y)
-    return model
+        model_dropdown = ttk.Combobox(self.root, textvariable=self.selected_model, values=self.model_options, state="readonly")
+        model_dropdown.grid(row=0, column=1, padx=10, pady=10)
 
-def evaluate_model(model, X, y):
-    """Evaluate the trained model."""
-    preds = model.predict(X)
-    mae = mean_absolute_error(y, preds)
-    return mae
+        # Feature Selection
+        feature_label = ttk.Label(self.root, text="Select Features:")
+        feature_label.grid(row=1, column=0, sticky=tk.W)
 
-def display_results(initial_mae, final_mae):
-    """Display the evaluation results."""
-    result_label.config(text=f"Initial Validation MAE: {initial_mae:,.0f}\nFinal Test MAE: {final_mae:,.0f}")
+        self.features = self.melbourne_data.select_dtypes(include='number').columns.tolist()
+        self.selected_features = []
 
-def train_and_evaluate_model():
-    """Train and evaluate the selected model."""
-    # Load data
-    file_path = file_entry.get()
-    data = load_data(file_path)
+        for i, feature in enumerate(self.features):
+            feature_var = tk.IntVar(value=1)
+            checkbox = ttk.Checkbutton(self.root, text=feature, variable=feature_var)
+            checkbox.grid(row=i+2, column=0, columnspan=2, sticky=tk.W)
+            self.selected_features.append((feature, feature_var))
 
-    # Select features
-    numeric_only = numeric_only_var.get()
-    features = select_features(data, numeric_only)
+        # Train Model Button
+        train_button = ttk.Button(self.root, text="Train Model", command=self.train_model)
+        train_button.grid(row=len(self.features)+3, column=0, columnspan=2, pady=10)
 
-    # Select target variable
-    target_variable = target_var.get()
-    X = data[features]
-    y = data[target_variable]
+        # Results Display
+        self.results_text = tk.Text(self.root, height=10, width=50)
+        self.results_text.grid(row=len(self.features)+4, column=0, columnspan=2, padx=10, pady=10)
 
-    # Split data
-    train_X, val_X, train_y, val_y = split_data(X, y)
+    def train_model(self):
+        # Extract selected features
+        selected_features = [feature for feature, var in self.selected_features if var.get() == 1]
 
-    # Standardize data
-    train_X_scaled, val_X_scaled, _ = standardize_data(train_X, val_X, val_X)
+        # Extract target variable
+        y = self.melbourne_data['Price']
 
-    # Train initial model
-    model_type = model_var.get()
-    model_params = {'alpha': alpha_scale.get(),
-                    'kernel': kernel_var.get(),
-                    'C': C_scale.get(),
-                    'gamma': gamma_var.get(),
-                    'epsilon': epsilon_scale.get()}
-    initial_model = train_model(model_type, train_X, val_X, train_y, val_y, model_params)
+        # Extract features
+        X = self.melbourne_data[selected_features]
 
-    # Evaluate initial model
-    if initial_model:
-        initial_preds_val = initial_model.predict(val_X)
-        initial_mae = mean_absolute_error(val_y, initial_preds_val)
+        # Split the data into training and testing sets
+        train_X, test_X, train_y, test_y = train_test_split(X, y, test_size=0.2, random_state=1)
 
-        # Tune model
-        final_model = train_model(model_type, train_X_scaled, val_X_scaled, train_y, val_y, model_params)
+        # Standardize the data for models that require it
+        scaler = StandardScaler()
+        train_X_scaled = scaler.fit_transform(train_X)
+        test_X_scaled = scaler.transform(test_X)
 
-        # Evaluate final model
-        if final_model:
-            test_X = scaler.transform(test_X)
-            final_preds_test = final_model.predict(test_X)
-            final_mae = mean_absolute_error(test_y, final_preds_test)
+        # Train the initial model
+        initial_model = self.get_selected_model(train_X, train_y)
+        initial_model.fit(train_X, train_y)
+        initial_preds = initial_model.predict(test_X)
+        initial_mae = mean_absolute_error(test_y, initial_preds)
 
-            # Display results
-            display_results(initial_mae, final_mae)
+        # Tune the model
+        tuned_model, tuned_mae = self.tune_model(initial_model, train_X_scaled, train_y, test_X_scaled, test_y)
 
-# Create main window
-root = tk.Tk()
-root.title("House Price Prediction")
+        # Display results
+        self.display_results(initial_mae, tuned_mae)
 
-# File Entry
-file_label = tk.Label(root, text="File Path:")
-file_label.grid(row=0, column=0, padx=5, pady=5, sticky="e")
-file_entry = tk.Entry(root)
-file_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+    def get_selected_model(self, X, y):
+        if self.selected_model.get() == 'Linear Regression':
+            return LinearRegression()
+        elif self.selected_model.get() == 'Ridge Regression':
+            return Ridge(alpha=1.0)
+        elif self.selected_model.get() == 'SVR':
+            return SVR(kernel='rbf', C=100, gamma=0.1, epsilon=0.1)
 
-# Model Selection
-model_label = tk.Label(root, text="Model Type:")
-model_label.grid(row=1, column=0, padx=5, pady=5, sticky="e")
-model_var = tk.StringVar()
-model_combobox = ttk.Combobox(root, textvariable=model_var, values=['Linear Regression', 'Ridge Regression', 'SVR'])
-model_combobox.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
+    def tune_model(self, model, train_X, train_y, test_X, test_y):
+        if self.selected_model.get() == 'Linear Regression':
+            return model, None
+        elif self.selected_model.get() == 'Ridge Regression':
+            alpha_values = [0.1, 1.0, 10.0, 100.0]
+            ridge_mae_scores = {alpha: self.get_ridge_mae(alpha, train_X, train_y, test_X, test_y) for alpha in alpha_values}
+            best_alpha = min(ridge_mae_scores, key=ridge_mae_scores.get)
+            return Ridge(alpha=best_alpha), ridge_mae_scores[best_alpha]
+        elif self.selected_model.get() == 'SVR':
+            C_values = [1, 10, 100]
+            gamma_values = ['scale', 'auto']
+            epsilon_values = [0.1, 0.01, 0.001]
+            svr_mae_scores = {(C, gamma, epsilon): self.get_svr_mae(C, gamma, epsilon, train_X, train_y, test_X, test_y)
+                            for C in C_values for gamma in gamma_values for epsilon in epsilon_values}
+            best_params = min(svr_mae_scores, key=svr_mae_scores.get)
+            return SVR(kernel='rbf', C=best_params[0], gamma=best_params[1], epsilon=best_params[2]), svr_mae_scores[best_params]
 
-# Numeric Features Only Checkbox
-numeric_only_var = tk.BooleanVar()
-numeric_only_check = tk.Checkbutton(root, text="Numeric Features Only", variable=numeric_only_var)
-numeric_only_check.grid(row=2, column=1, padx=5, pady=5, sticky="w")
+    def get_ridge_mae(self, alpha, train_X, train_y, test_X, test_y):
+        model = Ridge(alpha=alpha)
+        model.fit(train_X, train_y)
+        preds = model.predict(test_X)
+        mae = mean_absolute_error(test_y, preds)
+        return mae
 
-# Train Button
-train_button = tk.Button(root, text="Train and Evaluate", command=train_and_evaluate_model)
-train_button.grid(row=3, column=0, columnspan=2, padx=5, pady=5, sticky="ew")
+    def get_svr_mae(self, C, gamma, epsilon, train_X, train_y, test_X, test_y):
+        model = SVR(kernel='rbf', C=C, gamma=gamma, epsilon=epsilon)
+        model.fit(train_X, train_y)
+        preds = model.predict(test_X)
+        mae = mean_absolute_error(test_y, preds)
+        return mae
 
-# Result Label
-result_label = tk.Label(root, text="")
-result_label.grid(row=4, column=0, columnspan=2, padx=5, pady=5, sticky="ew")
+    def display_results(self, initial_mae, tuned_mae):
+        self.results_text.delete(1.0, tk.END)  # Clear previous results
 
-# Start GUI
-root.mainloop()
+        # Initial Model Results
+        self.results_text.insert(tk.END, "Initial Model Results:\n")
+        self.results_text.insert(tk.END, f"Initial Test MAE: {initial_mae:.0f}\n")
+
+        # Tuned Model Results (if applicable)
+        if tuned_mae is not None:
+            self.results_text.insert(tk.END, "\nTuned Model Results:\n")
+            self.results_text.insert(tk.END, f"Tuned Test MAE: {tuned_mae:.0f}\n")
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = HousePricePredictorGUI(root)
+    root.mainloop()

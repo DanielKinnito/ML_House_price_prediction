@@ -82,6 +82,7 @@ print("\nLinear Regression Final Test MAE: {:,.0f}".format(linear_test_mae))
 # Tune Ridge Regression
 alpha_values = [0.1, 1.0, 10.0, 100.0]
 ridge_mae_scores = {alpha: get_ridge_mae(alpha, train_X, val_X, train_y, val_y)[0] for alpha in alpha_values}
+
 best_ridge_alpha = min(ridge_mae_scores, key=ridge_mae_scores.get)
 
 final_ridge_mae, final_ridge_model = get_ridge_mae(best_ridge_alpha, train_X, val_X, train_y, val_y)
@@ -96,7 +97,6 @@ epsilon_values = [0.1, 0.01, 0.001]
 svr_mae_scores = {(C, gamma, epsilon): get_svr_mae(C, gamma, epsilon, train_X_scaled, val_X_scaled, train_y, val_y)[0]
                   for C in C_values for gamma in gamma_values for epsilon in epsilon_values}
 best_svr_params = min(svr_mae_scores, key=svr_mae_scores.get)
-
 final_svr_mae, final_svr_model = get_svr_mae(*best_svr_params, train_X_scaled, val_X_scaled, train_y, val_y)
 svr_preds_test = final_svr_model.predict(test_X_scaled)
 svr_test_mae = mean_absolute_error(test_y, svr_preds_test)
