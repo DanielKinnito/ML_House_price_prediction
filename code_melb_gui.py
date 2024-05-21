@@ -7,6 +7,7 @@ from sklearn.svm import SVR# type: ignore
 from sklearn.metrics import mean_absolute_error# type: ignore
 from sklearn.preprocessing import StandardScaler# type: ignore
 
+
 class HousePricePredictorGUI:
     def __init__(self, root):
         self.root = root
@@ -93,7 +94,9 @@ class HousePricePredictorGUI:
 
     def tune_model(self, model, train_X, train_y, test_X, test_y):
         if self.selected_model.get() == 'Linear Regression':
-            return model, None
+            scores = cross_val_score(model, train_X, train_y, scoring='neg_mean_absolute_error', cv=5)
+            tuned_mae = -scores.mean()
+            return model, tuned_mae
         elif self.selected_model.get() == 'Ridge Regression':
             alpha_values = [0.1, 1.0, 10.0, 100.0]
             ridge_mae_scores = {alpha: self.get_ridge_mae(alpha, train_X, train_y, test_X, test_y) for alpha in alpha_values}
